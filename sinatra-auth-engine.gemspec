@@ -5,7 +5,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "sinatra-auth-engine"
-  spec.version       = Sinatra::AuthEngine::Helpers::VERSION
+  spec.version       = '0.1.0'
   spec.authors       = ["stbnrivas"]
   spec.email         = ["stbnrivas@gmail.com\n"]
 

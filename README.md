@@ -2,7 +2,17 @@
 
 this gem is programmers friendly, or i will try. reduce configuration assuming that you like sequel the ruby database toolkit in the sinatra apps
 
+# By configuration annotations
 
+configure: if user can be authenticate whitout account has been activated
+configure: name of tables and fields into DB do named dinamically
+configure: policy max device authenticated allowed:
+    - allow and delete some other token
+    - doesnt allow because exit in another device
+    - show list of devices to select which un authorized
+configure: if user without activation try authentication dont assume right behaviour
+    - allow if configuration
+    - disallow if configuration
 
 # TODOING list
 
@@ -17,6 +27,8 @@ this gem is programmers friendly, or i will try. reduce configuration assuming t
 
 
 # TODO list
+
+- how time block authentication after max fails authentication exceed??
 
 - explain this gem use at sinatra:
   - classic style

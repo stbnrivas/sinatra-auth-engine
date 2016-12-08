@@ -1,3 +1,4 @@
+require 'sinatra/base'
 # require "sinatra/auth/engine/version"
 
 #puts Dir.pwd
@@ -6,6 +7,7 @@ module Sinatra
   module AuthEngine
     module Helpers
 
+      VERSION = "0.1"
       # class Auth
       #   attr_accessor :crypted_password, :password_salt, :roles
       #   def initialize(identifier,password,roles=[])
