@@ -27,6 +27,11 @@ class TestAuthEngine < MiniTest::Test
   end
 
   ## test without roles
+  def test_signup_with_identifier_already_in_use
+    assert Authenticable.signup("admin","hackthis")
+    refute Authenticable.signup("admin","iwillhackyou")
+    assert Authenticable.archive_authentication("admin")
+  end
 
   def test_creation_new_auth_and_activate_and_authenticate_and_block
     assert Authenticable.signup("johndoe","impenetrable")
@@ -48,7 +53,7 @@ class TestAuthEngine < MiniTest::Test
       refute Authenticable.authentication_by_password?("johndoe","impenetrable?")
     end
     refute Authenticable.authentication_by_remember_token?("authentication_token")
-    assert Authenticable.unsubscribe("johndoe")
+    assert Authenticable.archive_authentication("johndoe")
   end
 
 
@@ -57,37 +62,46 @@ class TestAuthEngine < MiniTest::Test
     refute Authenticable.active?("janedoe")
     refute_nil Authenticable.activation?("janedoe")
     refute Authenticable.authentication_by_password?("janedoe","janerules!")
+    assert Authenticable.archive_authentication("janedoe")
   end
 
   def test_auth_with_multiples_tokens
     # MAX_DEVICES_AUTHORIZED_ALLOWED
-
+    assert Authenticable.signup("johnconnor","wearegoingtodieall")
+    activation_code = Authenticable.activation_code("johnconnor")
+    assert Authenticable.activate!(activation_code)
+    tokens = []
+    for i in 0..Authenticable.max_device_authorized_allowed-1
+      tokens << Authenticable.authentication_by_password?("johnconnor","wearegoingtodieall")
+      refute_nil tokens[i]
+    end
+    tokens.each do |token|
+      assert Authenticable.authentication_by_remember_token?(token)
+    end
+    assert Authenticable.archive_authentication("johnconnor")
   end
 
+
   def test_if_tokens_expires_are_delete_when_new_auth_success
+    #how i get one auth with tokens expired?, default into a migration
+    # more ideas?
   end
 
   def test_activation_over_already_activate
+    assert Authenticable.signup("sarahconnor","wearegoingtodieall")
+    activation_code = Authenticable.activation_code("sarahconnor")
+    assert Authenticable.activate!(activation_code)
+    refute Authenticable.activate!(activation_code)
+    assert Authenticable.archive_authentication("sarahconnor")
   end
 
   def test_activation_unsuccessful
-    # assert_nil Authenticable.activation?("unknown")
-    # assert Authenticable.activate!(Authenticable.activation_code("unknown"))
-    # assert Authenticable.activation?("unknown")
-  end
-
-  def test_signup_with_identifier_already_in_use
-
+    activation_code = Authenticable.activation_code("sarahconnor")
+    refute Authenticable.activate!(activation_code)
+    assert Authenticable.archive_authentication("sarahconnor")
   end
 
   def test_uniqueness_auth
-  end
-
-  def test_activation
-    #actived?
-  end
-
-  def test_actived
   end
 
   def test_block
@@ -106,6 +120,13 @@ class TestAuthEngine < MiniTest::Test
   end
 
   def test_if_authentication_delete_expires_tokens
+  end
+
+  def test_change_identifier_for_already_in_use
+  end
+
+  def test_change_identifier_for_one_free
+    #test identifier_history works
   end
 
   def test_add_roles

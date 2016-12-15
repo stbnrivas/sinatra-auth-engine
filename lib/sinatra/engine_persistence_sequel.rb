@@ -33,7 +33,8 @@ module Sinatra
           # updated_at
         end
 
-        class AuthenticableUnsubscribe < Sequel::Model
+        class AuthenticableArchive < Sequel::Model
+
         end
 
         class Authenticable < Sequel::Model
@@ -47,11 +48,18 @@ module Sinatra
           def self.max_attempted_login_failed
             @@max_attempted_login_failed
           end
-
           def self.max_device_authorized_allowed
             @@max_device_authorized_allowed
           end
-          # in this case sequel takes over attributtes map to database, powered by Jeremy Evans Thanks
+
+          def self.time_disable_login_to_excced_max_login
+            @@time_disable_login_to_excced_max_login
+          end
+          def self.time_disable_login_to_excced_max_login
+            @@time_disable_login_to_excced_max_login
+          end
+
+          # in this case sequel takes over attributtes map to database, powered by Jeremy Evans, Thanks
           # attr_reader :index # database index autoincrement
           # attr_reader :identifier
           # attr_reader :password_salt
@@ -63,9 +71,9 @@ module Sinatra
           # attr_reader :password_reset_token
           # attr_reader :password_reset_token_expires_at
 
+          # return true if auth not already in use and user signup success
           def self.signup(identifier, password, roles=nil)
-            result = nil
-            # check if exist
+            result = false
             current_auth = Authenticable.find(:identifier => identifier)
             if current_auth.nil?
               password_salt = CrypterEngine.generate_salt
@@ -82,16 +90,14 @@ module Sinatra
                 self.add_roles_by_identifier(identifier,roles)
               end
               result = true
-            else # exist, then check password
-              if self.authentication_by_password?(identifier, password)
-                unless roles.nil?
-                  # if password right then add roles if doesnt exists now
-                  self.add_roles_by_identifier(identifier, roles)
-                end
-              end
-              result = true
+            else
+              result = false
             end
             return result
+          end
+
+          def self.change_identifier(old_identifier,new_identifier,attempted_password)
+            # TODO
           end
 
           def self.activation_code(identifier)
@@ -110,6 +116,7 @@ module Sinatra
             current_auth = Authenticable.find(:activation_code => activation_code)
             unless current_auth.nil?
               current_auth[:activation_at] = Time.now
+              current_auth[:activation_code] = nil
               current_auth.save
               result = true
             end
@@ -264,17 +271,15 @@ module Sinatra
 
 
               ## return remember_token if accepted or nil in other case
-              def self.authentication_by_password?(attempted_identifier, password)
+              def self.authentication_by_password?(attempted_identifier, attempted_password)
                 result = nil
                 current_auth = Authenticable.find(:identifier => attempted_identifier)
                 unless current_auth.nil?
                   if (current_auth[:block_until].nil?) or ( (Time.now > current_auth[:block_until]) and (current_auth[:attempts_failed] > 0) )
-
-                    attempted_password_hash = CrypterEngine.password_hash(password,current_auth[:password_salt])
+                    attempted_password_hash = CrypterEngine.password_hash(attempted_password,current_auth[:password_salt])
                     # confirm password and user has been activated
                     if current_auth[:activation_at].nil?
-                      # if use do not been activated, and can not be authenticated
-                      # TODO: user must be activate? or allow identify without
+                      # TODO: user must be activate? or allow identify without if use do not been activated, and can not be authenticated
                     elsif attempted_password_hash == current_auth[:password_hash]
                       # check if exceed max of devices authenticated
                       tokens = AuthenticableToken.where(:authenticable_id => current_auth[:id]) || []
@@ -284,6 +289,7 @@ module Sinatra
                       if tokens.count < @@max_device_authorized_allowed
                         # generate new remember token
                         result = Array.new(25){[*'0'..'9', *'a'..'z', *'A'..'Z'].sample}.join
+                        # puts "set result=#{result}"
                         new_token = AuthenticableToken.new(:authenticable_id => current_auth[:id],
                           :remember_token => result,
                           :remember_token_begin_at => Time.now,
@@ -299,7 +305,7 @@ module Sinatra
                       # decrement attmepts_failed
                       current_auth[:attempts_failed] =  current_auth[:attempts_failed] - 1
                       if current_auth[:attempts_failed] < 1
-                        current_auth[:block_until] = Time.now + (60*60) # 1 hour until next login
+                        current_auth[:block_until] = Time.now + Authenticable.time_disable_login_to_excced_max_login
                       end
                     end
                       # save into db
@@ -363,22 +369,19 @@ module Sinatra
                   return result
                 end
 
-                def self.unsubscribe(identifier,description=nil)
+                def self.archive_authentication(identifier,archived_reason=nil)
                   result = false
                   current_auth = Authenticable.find(:identifier => identifier)
                   unless current_auth.nil?
-                    # migration to AuthenticableUnsubscribes table
-                    AuthenticableUnsubscribe.new(:identifier => identifier,
-                    :unsubscribe_description => description,
-                    :activation_at => current_auth[:activation_at],
-                    :created_at => current_auth[:activation_at],
-                    :updated_at => current_auth[:updated_at])
-                    # delete Authenticable
-
-                    tokens = AuthenticableToken.find(:authenticable_id => current_auth[:id])
-                    tokens.destroy unless tokens.nil?
-                    roles = AuthenticableRole.find(:authenticable_id => current_auth[:id])
-                    roles.destroy unless roles.nil?
+                    # migration to AuthenticableArchived table
+                    auth_archived = AuthenticableArchive.new(:identifier => identifier,
+                      :archived_reason => archived_reason,
+                      :activation_at => current_auth[:activation_at],
+                      :created_at => current_auth[:activation_at],
+                      :updated_at => current_auth[:updated_at])
+                    auth_archived.save
+                    AuthenticableToken.filter(:authenticable_id => current_auth[:id]).delete
+                    AuthenticableRole.filter(:authenticable_id => current_auth[:id]).delete
                     current_auth.destroy
                     result = true
                   end

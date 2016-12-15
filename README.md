@@ -1,7 +1,8 @@
-<<<<<<< HEAD
 # Sinatra::AuthEngine
 
 this gem is programmers friendly, or i will try. reduce configuration assuming that you like sequel the ruby database toolkit in the sinatra apps
+
+The reason for the implementation of this gem is to honor J.M.R.N, from whom I could not learn all that he could teach me. Thanks you boss.
 
 # By configuration annotations
 
@@ -14,13 +15,14 @@ configure: policy max device authenticated allowed:
 configure: if user without activation try authentication dont assume right behaviour
     - allow if configuration
     - disallow if configuration
+configure: if user can change her identifier, this enable identifier_history field into db
 
 # TODOING list
 
 
 - to do connection_engine_sequel
     - migrating file engine.rb -> connection_engine_sequel.rb
-==>
+
     - at self.add_roles(remember_token, roles) allow or disallow current_user[:id]??
 
     - where fuck site the migration file for sequel ¿RakeFile? with a plain file for configuration where map the every attribute in every atttribute in database??? WTFB
@@ -82,25 +84,12 @@ meditate shall we do...
 
 - enable recovery by three answers ?
 
-## Description
-
-I am always always always including authentication code, never agai. DRY, in honor of my master sith I build my own authentication framework for Sinatra. With all knowledge of my master Jose Ruiz.
-
-You must be first Warden o Rodauth a very professional solution
 
 ## Features
 
 
 
 
-
-=======
-# Sinatra::Auth::Engine
-
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/sinatra/auth/engine`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
->>>>>>> c39d92db43bc71895cf80aec9c8d0c8d70220521
 
 ## Installation
 
@@ -121,43 +110,3 @@ Or install it yourself as:
 ## Usage
 
 TODO: Write usage instructions here
-
-<<<<<<< HEAD
-some like:
-
-    register::sinatra-auth-engine
-
-    require 'sinatra'
-    require 'sinatra/auth/engine/'
-
-    get "/hello" do
-      h "1 < 2"     # => "1 &lt; 2"
-    end
-
-=======
->>>>>>> c39d92db43bc71895cf80aec9c8d0c8d70220521
-## Development
-
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
-
-<<<<<<< HEAD
-## TODO: in implementation
-
-dinamically selection of attributes a
-
-=======
->>>>>>> c39d92db43bc71895cf80aec9c8d0c8d70220521
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/sinatra-auth-engine. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
-
-
-## License
-
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-<<<<<<< HEAD
-=======
-
->>>>>>> c39d92db43bc71895cf80aec9c8d0c8d70220521
