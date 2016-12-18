@@ -33,6 +33,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 1.13"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "minitest", "~> 5.9.1"
+  spec.add_development_dependency "minitest-debugger", "~> 1.0.3"
   spec.add_development_dependency "bcrypt", "~> 3.1.11"
   spec.add_development_dependency "sinatra", "~> 1.4.7"
   spec.add_development_dependency "sequel", "~> 4.39.0"

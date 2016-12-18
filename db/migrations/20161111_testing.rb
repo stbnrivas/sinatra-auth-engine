@@ -42,13 +42,13 @@ Sequel.migration do
       String :identifier, :unique => true
       String :password_salt
       String :password_hash
-      Integer :attempts_failed, :default => MAX_ATTTEMPTED_LOGIN_FAILED
+      Integer :remain_attempts_until_block, :default => MAX_ATTTEMPTED_LOGIN_FAILED
       DateTime :block_until
       String :activation_code, :default => nil
       DateTime :activation_at, :default => nil
 
-      String :password_reset_token
-      String :password_reset_token_expires_at
+      String :password_reset_token, :default => nil
+      String :password_reset_token_expires_at, :default => nil
 
       String :identifier_history, :default => nil
 
