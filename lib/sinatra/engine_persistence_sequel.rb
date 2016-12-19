@@ -145,35 +145,23 @@ module Sinatra
             end
           end
 
+          # return password_reset_token or nil if fail
           def self.reset_password!(identifier)
-            result = false
+            result = nil
             current_auth = Authenticable.find(:identifier => identifier)
-            unless current_auth.nil?
-              current_auth[:password_reset_token] = Array.new(30){[*'0'..'9', *'a'..'z', *'A'..'Z'].sample}.join
+            if !current_auth.nil? and Authenticable.activation?(identifier)
+              result = Array.new(30){[*'0'..'9', *'a'..'z', *'A'..'Z'].sample}.join
+              current_auth[:password_reset_token] = result
               current_auth[:password_reset_token_expires_at] = Time.now + @@password_reset_expires
               current_auth.save
-              tokens = AuthenticableToken.filter(:id => current_auth[:id])
-              tokens.each do |t|
-                t.destroy
-              end
-              result = true
             end
             return result
           end
 
-          def self.password_reset_token_by_identifier(identifier)
-            password_reset_token = nil
-            current_auth = Authenticable.find(:identifier => identifier)
-            unless current_auth.nil?
-              password_reset_token = current_auth[:password_reset_token]
-            end
-            return password_reset_token
-          end
-
-          def self.new_password(password_reset_token,new_password)
+          def self.new_password!(password_reset_token,new_password)
             result = false
             current_auth = Authenticable.find(:password_reset_token => password_reset_token)
-            if not current_auth.nil? #and current_auth[:remember_token_expires_at].is_a?(Time) and Time.now < current_auth[:remember_token_expires_at]
+            if !current_auth.nil? and Authenticable.reset_password?(current_auth[:identifier])
               password_salt = CrypterEngine.generate_salt
               password_hash = CrypterEngine.password_hash(new_password,password_salt)
               current_auth[:password_salt] = password_salt
@@ -181,6 +169,11 @@ module Sinatra
               current_auth[:password_reset_token] = nil
               current_auth[:password_reset_token_expires_at] = nil
               current_auth.save
+              # remove all tokens
+              tokens = AuthenticableToken.filter(:id => current_auth[:id])
+              tokens.each do |t|
+                t.destroy
+              end
               result = true
             end
             return result
@@ -310,9 +303,6 @@ module Sinatra
                 if current_auth[:activation_at].nil?
                   # TODO
                   # raise DENY_AUTHENTICATION_UNTIL_ACTIVATION if @@configuration[:deny_authenticate_until_activation]
-                elsif not current_auth[:password_reset_token].nil? #or not current_auth[:password_reset_token].empty?
-                  # TODO
-                  # raise DENY_AUTHENTICATION_WHILE_PASSWORD_RESET if @@configuration[:deny_authenticate_while_password_reset]
                 elsif attempted_password_hash == current_auth[:password_hash]
                   # check if exceed max of devices authenticated
                   tokens = AuthenticableToken.where(:authenticable_id => current_auth[:id]) || []
@@ -333,6 +323,10 @@ module Sinatra
                   else
                     # TODO:
                     # depends of max devices allowed policy must show message
+                    # ¿delete all tokens?
+                    # ¿delete older authentication?
+                    # ¿only notice about situation?
+                    raise RuntimeError, "exceed number of devices allowed"
                   end
                 else
                   # decrement attmepts_failed

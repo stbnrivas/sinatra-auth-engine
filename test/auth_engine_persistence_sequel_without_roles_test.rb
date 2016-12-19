@@ -25,9 +25,9 @@ class TestAuthEngine < MiniTest::Test
     # @db.tables #=> []
     # @db.create_table(:foo) { String(:foo) }
     # @db.tables #=> [:foo]
-    logger = Logger.new('logfile.log')
-    logger.info("-------------   new execution   -------------")
-    Authenticable.enable_logger(logger)
+    @logger = Logger.new('logfile.log')
+    @logger.info("-------------   new execution   -------------")
+    Authenticable.enable_logger(@logger)
   end
 
   def teardown
@@ -163,26 +163,36 @@ class TestAuthEngine < MiniTest::Test
   def test_reset_password_and_set_new_password
     assert Authenticable.signup("t803","iservertojohnconnor")
     # test without activation i can not login untill activate account
-    assert Authenticable.reset_password!("t803")
+    password_reset_token = Authenticable.reset_password!("t803")
+    assert_nil password_reset_token
     refute Authenticable.authentication_by_password?("t803","iservertojohnconnor")
-    password_reset_token = Authenticable.password_reset_token_by_identifier("t803")
-    assert Authenticable.new_password(password_reset_token,"iservertojohnconnoragain")
+    refute Authenticable.new_password!(password_reset_token,"iservertojohnconnoragain")
     refute Authenticable.authentication_by_password?("t803","iservertojohnconnoragain")
     assert_empty Authenticable.remember_tokens_by_identifier("t803")
     # test with activation
     activation_code = Authenticable.activation_code("t803")
     assert Authenticable.activation!(activation_code)
-    assert Authenticable.authentication_by_password?("t803","iservertojohnconnoragain")
-    assert Authenticable.reset_password!("t803") # reset_password! disable all tokens of authentication, disable with current identifier and password
-    assert_empty Authenticable.remember_tokens_by_identifier("t803")
-    password_reset_token = Authenticable.password_reset_token_by_identifier("t803")
-    assert Authenticable.new_password(password_reset_token,"iservetoskynet")
+    assert Authenticable.authentication_by_password?("t803","iservertojohnconnor")
+    refute_empty Authenticable.remember_tokens_by_identifier("t803")
+    password_reset_token = Authenticable.reset_password!("t803") # new_password! disable all tokens of authentication, disable with current identifier and password
+    refute_nil password_reset_token
+    assert Authenticable.new_password!(password_reset_token,"iservetoskynet")
     assert Authenticable.authentication_by_password?("t803","iservetoskynet")
     refute_empty Authenticable.remember_tokens_by_identifier("t803")
     assert Authenticable.archive_authentication("t803")
   end
 
   def test_reset_password_when_another_reset_password_in_time_and_ignore_nexts
+    assert Authenticable.signup("t804","iservertoskynet")
+    refute Authenticable.authentication_by_password?("t804","iservertoskynet")
+    password_reset_token = Authenticable.reset_password!("t804")
+    assert_nil password_reset_token
+    refute Authenticable.new_password!(password_reset_token,"iservertojohnconnor")
+    # test with activation
+    activation_code = Authenticable.activation_code("t804")
+    assert Authenticable.activation!(activation_code)
+    password_reset_token = Authenticable.reset_password!("t804")
+    assert Authenticable.new_password!(password_reset_token,"iservertojohnconnor")
   end
 
   def test_if_authentication_delete_expires_tokens
@@ -195,17 +205,23 @@ class TestAuthEngine < MiniTest::Test
     #test identifier_history works
   end
 
-  def test_change_identifier_for_one_free
-    #test identifier_history works
-  end
-
   def test_authentication_by_remember_token
+    assert Authenticable.signup("t805","iservertoskynet")
+    # test with activation
+    activation_code = Authenticable.activation_code("t805")
+    assert Authenticable.activation!(activation_code)
+    tokens = []
+    for i in 0..Authenticable.max_device_authorized_allowed-1
+      tokens << Authenticable.authentication_by_password?("t805","iservertoskynet")
+      refute_nil tokens[i]
+    end
+    tokens.each do |t|
+      assert Authenticable.authentication_by_remember_token?(t)
+    end
+    refute Authenticable.authentication_by_remember_token?("this-is-an-fake-remember-token-make-to-fail")
+    assert_raises RuntimeError do
+      Authenticable.authentication_by_password?("t805","iservertoskynet")
+    end
   end
-
-  def test_authentication_until_max_token_allowed
-  end
-
-  def test_reset_password_delete_all_remenber_tokens
-  end
-
+  
 end
