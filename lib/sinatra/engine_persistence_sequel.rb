@@ -52,6 +52,8 @@ module Sinatra
 
           def self.enable_logger(logger)
             @@logger = logger
+            # can use logger like this
+            # @@logger.info("...")
           end
 
           def self.max_attempted_login_failed
@@ -179,116 +181,37 @@ module Sinatra
             return result
           end
 
-          def self.add_roles_by_identifier(identifier, roles)
-            current_auth = Authenticable.find(:identifier => identifier)
-            unless current_auth.nil?
-              roles.each do |role|
-                current_role = Role.find(:name => role)
-                unless current_role.nil?
-                  # TODO: think about current_auth[:id]
-                  ur = AuthenticableRole.find(:authenticable_id => current_auth[:id], :role_id => current_role[:id])
-                  if ur.nil?
-                    # TODO: think about current_auth[:id]
-                    ur = AuthenticableRole.new(:authenticable_id => current_auth[:id], :role_id => current_role[:id],:status => 'enable')
-                    ur.save
-                  end
-                end
-              end
+          # check is user is block by exceed @@max_attempted_login_failed<1 times bad login
+          def self.block?(identifier)
+            result = false
+            u = Authenticable.find(:identifier => identifier)
+            # puts "block? remain:#{u[:remain_attempts_until_block]} block_until:#{u[:block_until]}"
+            unless u.nil?
+              result = true if (u[:remain_attempts_until_block]<1) or ((not u[:block_until].nil?) and (Time.now < u[:block_until]))
             end
-            raise NotImplementedYet
+            # puts result
+            return result
           end
 
-
-          def self.add_roles_by_remember_token(remember_token, roles)
-            #current_auth = Authenticable.find(:remember_token => remember_token)
-            auth_token = AuthenticableToken.find(:remember_token => remember_token)
-            current_auth = Authenticable.find(:id => auth_token[:id])
-            self.add_roles_by_identifier(current_auth[:identifier],roles)
-          end
-
-
-          def self.remove_roles(remember_token,roles)
-            current_auth = Authenticable.find(:remember_token => remember_token)
-            unless current_auth.nil?
-              roles.each do |role|
-                current_role = Role.find(:name => role)
-                unless current_role.nil?
-                  # TODO: think about current_auth[:id]
-                  ur = AuthenticableRole.find(:authenticable_id => current_auth[:id], :role_id => current_role[:id])
-                  unless ur.nil?
-                    ur.destroy
-                  end
-                end
-              end
+          # unblock the user access
+          def self.block!(identifier)
+            u = Authenticable.find(:identifier => identifier)
+            unless u.nil?
+              u[:remain_attempts_until_block] = 0
+              u[:block_until] = nil
+              u.save
             end
           end
 
-          def self.block_roles(remember_token,roles)
-            current_auth = Authenticable.find(:remember_token => remember_token)
-            unless current_auth.nil?
-              roles.each do |role|
-                current_role = Role.find(:name => role)
-                unless current_role.nil?
-                  # TODO: think about current_auth[:id]
-                  ur = AuthenticableRole.find(:user_id => current_auth[:id], :role_id => current_role[:id])
-                  unless ur.nil?
-                    ur[:status] = 'disable'
-                    ur.save
-                  end
-                end
-              end
+          # unblock the user access
+          def self.unblock!(identifier)
+            u = Authenticable.find(:identifier => identifier)
+            unless u.nil?
+              u[:remain_attempts_until_block] = @@max_attempted_login_failed
+              u[:block_until] = nil
+              u.save
             end
           end
-
-          def self.unblock_roles(remember_token,roles)
-            current_auth = Authenticable.find(:remember_token => remember_token)
-            unless current_auth.nil?
-              roles.each do |role|
-                current_role = Role.find(:name => role)
-                unless current_role.nil?
-                  ur = AuthenticableRole.find(:user_id => current_auth[:id], :role_id => current_role[:id])
-                  unless ur.nil?
-                    ur[:status] = 'enable'
-                    ur.save
-                  end
-                end
-              end
-            end
-          end
-
-
-
-            # check is user is block by exceed @@max_attempted_login_failed<1 times bad login
-            def self.block?(identifier)
-              result = false
-              u = Authenticable.find(:identifier => identifier)
-              # puts "block? remain:#{u[:remain_attempts_until_block]} block_until:#{u[:block_until]}"
-              unless u.nil?
-                result = true if (u[:remain_attempts_until_block]<1) or ((not u[:block_until].nil?) and (Time.now < u[:block_until]))
-              end
-              # puts result
-              return result
-            end
-
-            # unblock the user access
-            def self.block!(identifier)
-              u = Authenticable.find(:identifier => identifier)
-              unless u.nil?
-                u[:remain_attempts_until_block] = 0
-                u[:block_until] = nil
-                u.save
-              end
-            end
-
-            # unblock the user access
-            def self.unblock!(identifier)
-              u = Authenticable.find(:identifier => identifier)
-              unless u.nil?
-                u[:remain_attempts_until_block] = @@max_attempted_login_failed
-                u[:block_until] = nil
-                u.save
-              end
-            end
 
 
           ## return remember_token if accepted or nil in other case
@@ -346,70 +269,6 @@ module Sinatra
             return result
           end
 
-          # return remember_token if accepted or nil in other case
-          # def self.authentication_by_password?(attempted_identifier, attempted_password)
-          #   result = nil
-          #   current_auth = Authenticable.find(:identifier => attempted_identifier)||{}
-          #   attempted_password_hash = CrypterEngine.password_hash(attempted_password,current_auth[:password_salt])
-          #   if attempted_password_hash == current_auth[:password_hash] and Authenticable.activation?(current_auth[:identifier]) and !Authentication.block?(current_auth[:identifier]) and !Authentication.reset_password?(current_auth[:identifier])
-          #     # check if exceed max of devices authenticated
-          #     if tokens.count < @@max_device_authorized_allowed
-          #       destroy_token_authentication_expires_by_auth(current_auth[:id])
-          #       result = Array.new(25){[*'0'..'9', *'a'..'z', *'A'..'Z'].sample}.join
-          #       new_token = AuthenticableToken.new(:authenticable_id => current_auth[:id],
-          #         :remember_token => result,
-          #         :remember_token_begin_at => Time.now,
-          #         :remember_token_expires_at => Time.now + @@time_expiration_token)
-          #       new_token.save
-          #       current_auth[:remain_attempts_until_block] = @@max_attempted_login_failed
-          #       current_auth.save
-          #     else
-          #       raise MAX_DEVICES_ALLOW_EXCEED
-          #     end
-          #   elsif Authenticable.activation?(current_auth[:identifier]) and not Authentication.block?(current_auth[:identifier]) and not Authentication.reset_password?(current_auth[:identifier])
-          #   # elsif Authenticable.activation?(current_auth[:identifier]) and !Authentication.block?(current_auth[:identifier]) and !Authentication.reset_password?(current_auth[:identifier])
-          #     # decrease remain_attempts_until_block
-          #     current_auth[:remain_attempts_until_block] =  current_auth[:remain_attempts_until_block]-1
-          #     if current_auth[:remain_attempts_until_block] < 1
-          #       current_auth[:block_until] = Time.now + Authenticable.time_disable_login_to_excced_max_login
-          #     end
-          #     current_auth.save
-          #   else
-          #   end
-          #   return result
-          # end
-
-          def self.create_role(role_name)
-            result = false
-            role = Role.find(:name => role_name)
-            unless role.nil?
-              r = Role.new(:name => role_name, :status => 'enable')
-              r.save
-            end
-            return result
-          end
-
-          def self.has_roles_by_identifier?(identifier,roles)
-            #TODO: check authentication_token are in valid period???
-            result = false
-            current_auth = Authenticable.find(:identifier => identifier)
-            unless current_auth.nil?
-              roles.each do |role|
-                have_role = Role.join(:authenticable_roles, :role_id => :id ).where(:status => 'enable' ).where(:authenticable_id => current_auth[:id]).where(:name => role).count == 1 ? true : false ;
-                result = (result or have_role) # one of role at least
-              end
-            else
-              result = false
-            end
-            return result
-          end
-
-          def self.has_roles_by_token?(remember_token,roles)
-              auth_token = AuthenticableToken.find(:remember_token => remember_token)
-              current_auth = Authenticable.find(:id => auth_token[:authenticable_id])
-              return self.has_roles_by_identifier?(current_auth[:identifier],roles)
-          end
-
           def self.remember_tokens_by_identifier(identifier)
             result = []
             current_auth = Authenticable.find(:identifier => identifier)
@@ -433,6 +292,147 @@ module Sinatra
             return result
           end
 
+          ##################################################
+          # Roles Management
+
+          def self.create_role(role_name)
+            result = false
+            role = Role.find(:name => role_name)
+            if role.nil?
+              r = Role.new(:name => role_name, :status => 'enable')
+              result = r.save
+            # else
+              # raise RuntimeError, "RoleNameAlreadyInUse"
+            end
+            return result
+          end
+
+          def self.delete_role(role_name)
+            role = Role.find(:name => role_name)
+            users_with_role = AuthenticableRole.find(:role_id => role[:id])
+            unless users_with_role.nil?
+              users_with_role.each do |u|
+                u.delete # or destroy
+              end
+            end
+            role.delete
+          end
+
+          def self.add_roles_by_identifier(identifier, roles)
+            result = false
+            current_auth = Authenticable.find(:identifier => identifier)
+            unless current_auth.nil?
+              roles.each do |role|
+                current_role = Role.find(:name => role)
+                unless current_role.nil?
+                  # @@logger.debug("add role #{current_role[:name]} to #{current_auth[:identifier]}")
+                  #check if identifier do have not
+                  if AuthenticableRole.filter(:authenticable_id=>current_auth[:id], :role_id=>current_role[:id]).count == 0
+                    auth_role = AuthenticableRole.new(:authenticable_id => current_auth[:id], :role_id => current_role[:id])
+                    result = result or auth_role.save
+                  else
+                    # @@logger.debug("role already assigned")
+                  end
+                else
+                  # role to set dont exists
+                  # @@logger.debug("try adding a role unknown")
+                end
+              end
+            else
+              # auth dont exists
+            end
+          end
+
+          def self.delete_roles_by_identifier(identifier, roles)
+            result = 0
+            current_auth = Authenticable.find(:identifier => identifier)
+            roles.each do |role|
+              current_role = Role.find(:name=>role)
+              unless current_role.nil?
+                result = result + AuthenticableRole.filter(:authenticable_id => current_auth[:id], :role_id => current_role[:id]).delete
+              end
+            end
+            return result>0
+          end
+
+          def self.add_roles_by_remember_token(remember_token, roles)
+            #current_auth = Authenticable.find(:remember_token => remember_token)
+            auth_token = AuthenticableToken.find(:remember_token => remember_token)
+            current_auth = Authenticable.find(:id => auth_token[:id])
+            self.add_roles_by_identifier(current_auth[:identifier],roles)
+          end
+
+          def self.delete_roles_by_remember_token(remember_token, roles)
+            current_auth_token = AuthenticableToken.find(:remember_token => remember_token)
+            current_auth = Authenticable.find(:id => current_auth_token[:authenticable_id])
+            Authenticable.delete_roles_by_identifier(current_auth[:identifier], roles)
+          end
+
+          def self.block_roles(roles)
+            roles.each do |role|
+              current_role = Role.find(:name => role)
+              unless current_role.nil?
+                current_role[:status]='disable'
+                current_role.save
+              end
+            end
+          end
+
+          def self.unblock_roles(roles)
+            roles.each do |role|
+              current_role = Role.find(:name => role)
+              unless current_role.nil?
+                current_role[:status]='enable'
+                current_role.save
+              end
+            end
+          end
+
+          def self.authentication_by_password_with_roles?(attempted_identifier,attempted_password,attempted_roles)
+            result = nil
+            roles_enabled = Authenticable.remove_roles_disable(attempted_roles)
+            if Authenticable.has_role_by_identifier?(attempted_identifier,roles_enabled)
+              result = Authenticable.authentication_by_password?(attempted_identifier,attempted_password)
+            end
+            return result
+          end
+
+          def self.authentication_by_remember_token_with_roles?(attempted_remember_token,attempted_roles)
+            result = false
+            roles_enabled = Authenticable.remove_roles_disable(attempted_roles)
+            if Authenticable.has_role_by_remember_token?(attempted_remember_token,roles_enabled)
+              result = Authenticable.authentication_by_remember_token?(attempted_remember_token)
+            end
+            return result
+          end
+
+
+          # def self.authentication_with_roles_by_identifier?(identifier,roles)
+          #   #TODO: check authentication_token are in valid period???
+          #   result = false
+          #   current_auth = Authenticable.find(:identifier => identifier)
+          #   unless current_auth.nil?
+          #     roles.each do |role|
+          #       have_role = Role.join(:authenticable_roles, :role_id => :id ).where(:status => 'enable' ).where(:authenticable_id => current_auth[:id]).where(:name => role).count == 1 ? true : false ;
+          #       result = (result or have_role) # one of role at least
+          #     end
+          #   else
+          #     result = false
+          #   end
+          #   return result
+          # end
+
+          # def self.authentication_with_roles_by_remember_token?(remember_token,roles)
+          #     auth_token = AuthenticableToken.find(:remember_token => remember_token)
+          #     current_auth = Authenticable.find(:id => auth_token[:authenticable_id])
+          #     return Authenticable.authentication_by_remember_token?(authentication_token) and Authenticable.has_roles_by_identifier?(current_auth[:identifier],roles)
+          # end
+
+
+
+
+
+
           def self.archive_authentication(identifier,archived_reason=nil)
             result = false
             current_auth = Authenticable.find(:identifier => identifier)
@@ -453,12 +453,46 @@ module Sinatra
 
           private
 
-          def destroy_token_authentication_expires_by_auth(auth_id)
-            tokens = AuthenticableToken.where(:authenticable_id => auth_id) || []
-            tokens.each do |token|
-              token.destroy if Time.now > token[:remember_token_expires_at]
+            def self.destroy_token_authentication_expires_by_auth(auth_id)
+              tokens = AuthenticableToken.where(:authenticable_id => auth_id) || []
+              tokens.each do |token|
+                token.destroy if Time.now > token[:remember_token_expires_at]
+              end
             end
-          end
+
+            def self.has_role_by_identifier?(identifier,roles)
+              result = 0
+              unless roles.nil?
+                current_auth = Authenticable.find(:identifier => identifier)
+                unless current_auth.nil?
+                  roles.each do |r|
+                    current_role = Role.find(:name => r)
+                    unless current_role.nil?
+                      result = result + AuthenticableRole.filter(:authenticable_id => current_auth[:id], :role_id => current_role[:id]).count
+                    end
+                  end
+                end
+              end
+              return result > 0
+            end
+
+            def self.has_role_by_remember_token?(remember_token,roles)
+              current_auth_token = AuthenticableToken.find(:remember_token =>remember_token)
+              current_auth = Authenticable.find(:id => current_auth_token[:authenticable_id])
+              return Authenticable.has_role_by_identifier?(current_auth[:identifier],roles)
+            end
+
+            def self.remove_roles_disable(roles)
+              result = []
+              unless roles.nil?
+                roles.each do |role|
+                  current_role = Role.find(:name => role)
+                  result << role if !current_role.nil? and current_role[:status]=='enable'
+                end
+              end
+              result=nil if result.empty?
+              result
+            end
 
         end # class
 

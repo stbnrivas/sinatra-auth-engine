@@ -30,6 +30,7 @@ configure: if user can change her identifier, this enable identifier_history fie
 
 
 # TODO list
+- question? if you try add role by signup or add_roles_by_identifier never see an error even you give a non existing role_name, because the user should can signup without problems, is a problem of programmer
 
 - how time block authentication after max fails authentication exceed??
 

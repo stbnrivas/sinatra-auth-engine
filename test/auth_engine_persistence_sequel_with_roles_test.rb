@@ -2,15 +2,15 @@
 require 'minitest/autorun'
 require 'minitest/color'
 require 'sequel'
+# require 'minitest/debugger'
 
 require './test/test_helper'
 require './lib/sinatra/auth_engine'
 require './lib/sinatra/engine_persistence_sequel'
 #require 'minitest/spec'
 
-
+require 'logger'
 # this file must call from gem's root folder: sinatra-auth-engine-folder
-
 
 class TestAuthEngine < MiniTest::Test
   include Sinatra::AuthEngine::Helpers
@@ -24,37 +24,146 @@ class TestAuthEngine < MiniTest::Test
     # @db.tables #=> []
     # @db.create_table(:foo) { String(:foo) }
     # @db.tables #=> [:foo]
+    @logger = Logger.new('logfile-with-roles.log')
+    @logger.info("-------------   new execution   -------------")
+    Authenticable.enable_logger(@logger)
   end
 
-  ## test without roles
+  def teardown
+    # when end test, all Authenticable must be delete with this method
 
-  def test_creation_new_auth_without_roles_and_activate_and_authenticate_and_block
-    assert Authenticable.signup("johndoe","impenetrable")
-    refute Authenticable.active?("johndoe")
-    assert Authenticable.block?("johndoe")
-    # for every role
-    roles_result = DB[:roles].select(:name)
-    roles = roles_result.collect{|r|r[:name]}
-    roles.each do |rol|
-      refute Authenticable.has_roles_by_identifier?('johndoe',[rol])
+    auth_roles = AuthenticableRole.all
+    auth_roles.each do |a|
+      a.delete
     end
-    refute_nil Authenticable.activation?("johndoe")
-    activation_code = Authenticable.activation_code("johndoe")
-    assert Authenticable.activate!(activation_code)
-    assert Authenticable.activation?("johndoe")
-    authentication_token = Authenticable.authentication_by_password?("johndoe","impenetrable")
-    assert Authenticable.authentication_by_remember_token?(authentication_token)
-    for i in 1..MAX_ATTTEMPTED_LOGIN_FAILED
-      refute Authenticable.authentication_by_password?("johndoe","impenetrable?")
+    roles = Role.all
+    roles.each do |r|
+      r.delete
     end
-    refute Authenticable.authentication_by_remember_token?("authentication_token")
-    assert Authenticable.unsubscribe("johndoe")
+    auths = Authenticable.all
+    auths.each do |a|
+      Authenticable.archive_authentication(a[:identifier])
+    end
   end
 
+  def test_creation_and_deletion_of_roles_with_one_role
+    assert Authenticable.create_role("role1")
+    assert Authenticable.signup("user1","impenetrable",["role1"])
+    activation_code = Authenticable.activation_code("user1")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user1", ["role1"]) # that already exist do at signup
+    assert_nil Authenticable.authentication_by_password_with_roles?("user1","letmeguess",["role1"])
+    assert_nil Authenticable.authentication_by_password_with_roles?("user1","impenetrable",["notexist"])
+    refute_nil Authenticable.authentication_by_password_with_roles?("user1","impenetrable",["role1"])
+    assert Authenticable.delete_roles_by_identifier("user1", ["role1"])
+    assert Authenticable.archive_authentication("user1")
+    assert Authenticable.delete_role("role1")
+  end
+
+  def test_creation_and_deletion_of_roles_with_multiple_roles
+    assert Authenticable.create_role("role2_1")
+    assert Authenticable.create_role("role2_2")
+    assert Authenticable.create_role("role2_3")
+    assert Authenticable.signup("user2","impenetrable")
+    activation_code = Authenticable.activation_code("user2")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user2", ["role2_1"]) # that already exist do at signup
+    assert Authenticable.add_roles_by_identifier("user2", ["role2_2"]) # that already exist do at signup
+    refute_nil Authenticable.authentication_by_password_with_roles?("user2","impenetrable",["role2_1"])
+    refute_nil Authenticable.authentication_by_password_with_roles?("user2","impenetrable",["role2_2"])
+    refute_nil Authenticable.authentication_by_password_with_roles?("user2","impenetrable",["role2_1","role2_2"])
+    assert_nil Authenticable.authentication_by_password_with_roles?("user2","impenetrable",["role2_3"])
+    assert Authenticable.delete_roles_by_identifier("user2", ["role2_1"])
+    assert Authenticable.archive_authentication("user2")
+    assert Authenticable.delete_role("role2_1")
+    assert Authenticable.delete_role("role2_2")
+    assert Authenticable.delete_role("role2_3")
+  end
+
+  def test_signup_with_role_non_exist
+    assert Authenticable.create_role("role3")
+    assert Authenticable.signup("user3","impenetrable",["unknown_role"])
+    # if an user/client can signup, but programmer hasn't create role previously, allow the signup
+    assert Authenticable.archive_authentication("user3")
+    assert Authenticable.delete_role("role3")
+  end
+
+  def test_signup_with_role_and_later_add_same_role
+    assert Authenticable.create_role("role4")
+    assert Authenticable.signup("user4","impenetrable",["role4"])
+    assert Authenticable.add_roles_by_identifier("user4", ["role4"])
+    assert Authenticable.add_roles_by_identifier("user4", ["role4"])
+    # if an user/client can signup, but programmer hasn't create role previously, allow the signup
+    assert Authenticable.archive_authentication("user4")
+    assert Authenticable.delete_role("role4")
+  end
+
+  def test_add_role_non_existent
+    assert Authenticable.signup("user5","impenetrable")
+    assert Authenticable.add_roles_by_identifier("user5", ["unknown_role"])
+    # TODO: above is not a bug is a feature xP, nothing is save to database.
+    # maybe use a exception
+    assert Authenticable.archive_authentication("user5")
+  end
+
+  def test_authentication_with_one_role_existent
+    assert Authenticable.create_role("role6")
+    assert Authenticable.signup("user6","impenetrable")
+    activation_code = Authenticable.activation_code("user6")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user6", ["role6"])
+    remember_token = Authenticable.authentication_by_password?("user6","impenetrable")
+    refute_nil remember_token
+    assert Authenticable.authentication_by_remember_token?(remember_token,["role6"])
+    assert Authenticable.archive_authentication("user6")
+    assert Authenticable.delete_role("role6")
+  end
+
+  def test_authentication_with_one_role_non_existent
+    assert Authenticable.signup("user7","impenetrable")
+    activation_code = Authenticable.activation_code("user7")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user7", ["role7"])
+    remember_token = Authenticable.authentication_by_password?("user7","impenetrable")
+    refute_nil remember_token
+    refute Authenticable.authentication_by_remember_token_with_roles?(remember_token,["unknown_role"])
+    assert Authenticable.archive_authentication("user7")
+  end
+
+  def test_add_role_and_authenticate_and_delete_role_and_authenticate
+    assert Authenticable.create_role("role8")
+    assert Authenticable.signup("user8","impenetrable")
+    activation_code = Authenticable.activation_code("user8")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user8", ["role8"])
+    remember_token = Authenticable.authentication_by_password?("user8","impenetrable")
+    assert Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role8"])
+    refute_nil remember_token
+    assert Authenticable.delete_roles_by_identifier("user8",["role8"])
+    refute Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role8"])
+    assert Authenticable.archive_authentication("user8")
+    assert Authenticable.delete_role("role8")
+  end
+
+  def test_authenticate_with_role_block_and_role_unblock
+    assert Authenticable.create_role("role9")
+    assert Authenticable.signup("user9","impenetrable")
+    activation_code = Authenticable.activation_code("user9")
+    assert Authenticable.activation!(activation_code)
+    assert Authenticable.add_roles_by_identifier("user9", ["role9"])
+    remember_token = Authenticable.authentication_by_password?("user9","impenetrable")
+    assert Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role9"])
+    assert Authenticable.block_roles(["role9"])
+    refute Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role9"])
+    assert Authenticable.unblock_roles(["role9"])
+    assert Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role9"])
+    assert Authenticable.delete_roles_by_identifier("user9",["role9"])
+    refute Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role9"])
+    assert Authenticable.archive_authentication("user9")
+    assert Authenticable.delete_role("role9")
+  end
 
   def test_auth_without_roles_without_activation
-    
-
   end
 
   def test_auth_with_multiples_tokens

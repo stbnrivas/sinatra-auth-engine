@@ -12,7 +12,6 @@ require './lib/sinatra/engine_persistence_sequel'
 require 'logger'
 # this file must call from gem's root folder: sinatra-auth-engine-folder
 
-
 class TestAuthEngine < MiniTest::Test
   include Sinatra::AuthEngine::Helpers
   include Sinatra::AuthEngine::Helpers::PersistenceSequel
@@ -31,6 +30,8 @@ class TestAuthEngine < MiniTest::Test
   end
 
   def teardown
+    # when end test, all Authenticable must be delete with this method
+    # like opposite of setup
     auths = Authenticable.all
     auths.each do |a|
       Authenticable.archive_authentication(a[:identifier])
@@ -223,5 +224,5 @@ class TestAuthEngine < MiniTest::Test
       Authenticable.authentication_by_password?("t805","iservertoskynet")
     end
   end
-  
+
 end
