@@ -19,6 +19,7 @@ configure: if user can change her identifier, this enable identifier_history fie
 
 # TODOING list
 
+- show how to run test with logs enable or with logs disable
 
 - to do connection_engine_sequel
     - migrating file engine.rb -> connection_engine_sequel.rb

@@ -164,6 +164,19 @@ class TestAuthEngine < MiniTest::Test
   end
 
   def test_auth_without_roles_without_activation
+    assert Authenticable.create_role("role10")
+    assert Authenticable.signup("user10","impenetrable")
+    assert Authenticable.add_roles_by_identifier("user10", ["role10"])
+    remember_token = Authenticable.authentication_by_password?("user10","impenetrable")
+    assert_nil remember_token
+    activation_code = Authenticable.activation_code("user10")
+    assert Authenticable.activation!(activation_code)
+    remember_token = Authenticable.authentication_by_password?("user10","impenetrable")
+    assert Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role10"])
+    assert Authenticable.delete_roles_by_identifier("user10",["role10"])
+    refute Authenticable.authentication_by_remember_token_with_roles?(remember_token,["role10"])
+    assert Authenticable.archive_authentication("user10")
+    assert Authenticable.delete_role("role10")
   end
 
   def test_auth_with_multiples_tokens
@@ -172,16 +185,13 @@ class TestAuthEngine < MiniTest::Test
   def test_if_tokens_expires_are_delete_when_new_auth_success
   end
 
-  def test_activation_over_already_activate
-  end
-
-  def test_activation_unsuccessful
-    # assert_nil Authenticable.activation?("unknown")
-    # assert Authenticable.activate!(Authenticable.activation_code("unknown"))
-    # assert Authenticable.activation?("unknown")
-  end
-
   def test_signup_with_identifier_already_in_use
+    assert Authenticable.create_role("role10")
+    assert Authenticable.signup("user10","impenetrable",["role10"])
+    assert Authenticable.add_roles_by_identifier("user10", ["role10"])
+    remember_token = Authenticable.authentication_by_password?("user10","impenetrable")
+    assert_nil remember_token
+    refute Authenticable.signup("user10","impenetrable")
 
   end
 
@@ -232,13 +242,13 @@ class TestAuthEngine < MiniTest::Test
 
   end
 
-  def test_authentication_by_remenber_token
+  def test_authentication_by_remember_token
   end
 
   def test_authentication_until_max_token_allowed
   end
 
-  def test_reset_password_delete_all_remenber_tokens
+  def test_reset_password_delete_all_remember_tokens
   end
 
 end

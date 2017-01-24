@@ -59,12 +59,6 @@ class TestAuthEngine < MiniTest::Test
     assert Authenticable.signup("johndoe","impenetrable")
     refute Authenticable.activation?("johndoe")
     refute Authenticable.block?("johndoe")
-    # for every role
-    roles_result = DB[:roles].select(:name)
-    roles = roles_result.collect{|r|r[:name]}
-    roles.each do |rol|
-      refute Authenticable.has_roles_by_identifier?('johndoe',[rol])
-    end
     refute_nil Authenticable.activation?("johndoe")
     activation_code = Authenticable.activation_code("johndoe")
     assert Authenticable.activation!(activation_code)
@@ -117,7 +111,7 @@ class TestAuthEngine < MiniTest::Test
     assert Authenticable.archive_authentication("sarahconnor")
   end
 
-  def test_activation_that_not_exist
+  def test_activation_that_not_exist    
     activation_code = Authenticable.activation_code("t1000")
     refute Authenticable.activation!(activation_code)
   end

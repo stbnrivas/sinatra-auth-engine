@@ -94,7 +94,9 @@ module Sinatra
                 :password_hash => password_hash,
                 :password_salt => password_salt,
                 :remain_attempts_until_block => @@max_attempted_login_failed,
-                :activation_code => activation_code)
+                :activation_code => activation_code,
+                :created_at=> Time.now,
+                :updated_at=> Time.now)
               new_authenticable.save
               # check if roles exist for add AuthenticableRole
               unless roles.nil?
@@ -441,7 +443,7 @@ module Sinatra
               auth_archived = AuthenticableArchive.new(:identifier => identifier,
                 :archived_reason => archived_reason,
                 :activation_at => current_auth[:activation_at],
-                :created_at => current_auth[:activation_at],
+                :created_at => current_auth[:created_at],
                 :updated_at => current_auth[:updated_at])
               auth_archived.save
               AuthenticableToken.filter(:authenticable_id => current_auth[:id]).delete
